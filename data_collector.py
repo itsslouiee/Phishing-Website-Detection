@@ -11,9 +11,10 @@ import features as fe
 disable_warnings(InsecureRequestWarning)
 
 # Step 1: csv to dataframe
-URL_file_name = "dataset/verified_online.csv"
-#URL_file_name = "dataset/tranco_26J79.csv"
+#URL_file_name = "dataset/verified_online.csv"
+URL_file_name = "dataset/tranco_26J79.csv"
 data_frame = pd.read_csv(URL_file_name)
+#print(data_frame.head()) 
 
 # retrieve only "url" column and convert it to a list
 URL_list = data_frame['url'].to_list()
@@ -23,11 +24,11 @@ begin = 0
 end = 1000
 
 # for illegitimate urls
-collection_list = URL_list[begin:end]
+# collection_list = URL_list[begin:end]
 
-# for the legitimate ones
-# tag = "http://"
-# collection_list = [tag + url for url in collection_list]
+# for legitimate urls
+tag = "http://"
+collection_list = [tag + url for url in URL_list[begin:end]]
 
 
 # function to scrape the content of the URL and convert to a structured form for each
@@ -100,12 +101,12 @@ columns = [
 
 df = pd.DataFrame(data=data, columns=columns)
 
-# labelling for phishing
-df['label'] = 1
+# labelling for legitimate
+df['label'] = 0
 
-#labelling for legitimate
-#df['label'] = 0
+#labelling for phishing
+#df['label'] = 1
 
-df.to_csv("structured_data_phishing.csv", mode='a', index=False, header=False)  # header should be false after the first run
-#df.to_csv("structured_data_legitimate.csv", mode='a', index=False, header=False)  
+df.to_csv("dataset/structured_legitimate_data.csv", mode='a', index=False)  # header should be false after the first run
+#df.to_csv("dataset/structured_phishing_data.csv", mode='a', index=False, header=False)
 
