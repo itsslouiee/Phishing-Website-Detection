@@ -13,17 +13,17 @@ disable_warnings(InsecureRequestWarning)
 
 # Step 1: csv to dataframe
 URL_file_name = "dataset/PhishTank_2026.csv"
-#URL_file_name = "dataset/tranco_26J79.csv"
+#URL_file_name = "dataset/tranco_K9LNW.csv"
 
 data_frame = pd.read_csv(URL_file_name)
 #print(data_frame.head()) 
 
-# retrieve only "url" column and convert it to a list
-URL_list = data_frame['url'].to_list()
+# retrieve only "URL" column and convert it to a list
+URL_list = data_frame['URL'].to_list()
 
 # restrict the URL count
-begin = 1000
-end = 2000
+begin = 1500
+end = 8000
 
 # for legitimate urls
 #tag = "http://"
@@ -43,7 +43,7 @@ def create_structured_data(url_list):
                 print(i, ". HTTP connection was not successful for the URL: ", url_list[i])
             else:
                 soup = BeautifulSoup(response.content, "html.parser")
-                vector = fe.create_vector(soup)
+                vector = fe.create_vector(soup, url_list[i])
                 vector.append(str(url_list[i]))
                 data_list.append(vector)
         except re.exceptions.RequestException as e:
@@ -115,6 +115,5 @@ file_path = "dataset/structured_phishing_data.csv"
 
 write_header = not os.path.exists(file_path)  
 
-#df.to_csv(file_path, mode='a', index=False, header=write_header)
 df.to_csv(file_path, mode='a', index=False, header=write_header)
 
