@@ -1,5 +1,6 @@
 # data collection
 import requests as re
+import os
 from urllib3.exceptions import InsecureRequestWarning
 from urllib3 import disable_warnings
 
@@ -11,8 +12,9 @@ import features as fe
 disable_warnings(InsecureRequestWarning)
 
 # Step 1: csv to dataframe
-#URL_file_name = "dataset/verified_online.csv"
-URL_file_name = "dataset/tranco_26J79.csv"
+URL_file_name = "dataset/PhishTank_2026.csv"
+#URL_file_name = "dataset/tranco_26J79.csv"
+
 data_frame = pd.read_csv(URL_file_name)
 #print(data_frame.head()) 
 
@@ -20,15 +22,15 @@ data_frame = pd.read_csv(URL_file_name)
 URL_list = data_frame['url'].to_list()
 
 # restrict the URL count
-begin = 0
-end = 1000
-
-# for illegitimate urls
-# collection_list = URL_list[begin:end]
+begin = 1000
+end = 2000
 
 # for legitimate urls
-tag = "http://"
-collection_list = [tag + url for url in URL_list[begin:end]]
+#tag = "http://"
+#collection_list = [tag + url for url in URL_list[begin:end]]
+
+# for phishing urls
+collection_list = URL_list[begin:end]
 
 
 # function to scrape the content of the URL and convert to a structured form for each
@@ -102,11 +104,17 @@ columns = [
 df = pd.DataFrame(data=data, columns=columns)
 
 # labelling for legitimate
-df['label'] = 0
+#df['label'] = 0
 
 #labelling for phishing
-#df['label'] = 1
+df['label'] = 1
 
-df.to_csv("dataset/structured_legitimate_data.csv", mode='a', index=False)  # header should be false after the first run
-#df.to_csv("dataset/structured_phishing_data.csv", mode='a', index=False, header=False)
+# True only if file doesn't exist yet   
+file_path = "dataset/structured_phishing_data.csv"
+#file_path = "dataset/structured_legitimate_data.csv"
+
+write_header = not os.path.exists(file_path)  
+
+#df.to_csv(file_path, mode='a', index=False, header=write_header)
+df.to_csv(file_path, mode='a', index=False, header=write_header)
 
