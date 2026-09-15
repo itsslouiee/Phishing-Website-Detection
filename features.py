@@ -205,7 +205,7 @@ def number_of_table(soup):
     return len(soup.find_all("table"))
 
 
-
+# i removed it because i encoutered some errors with it
 # LEXICAL FEATURES
 
 # def url_length(url):
