@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn import svm, tree
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
+from xgboost import XGBClassifier
 
 # read csv file and create pandas dataframe
 legitimate_df = pd.read_csv("dataset/structured_legitimate_data.csv")
@@ -40,6 +43,12 @@ X = combined_df.drop(["URL", "label"], axis=1)
 # label: 0 = legitimate and 1 = phishing
 Y = combined_df["label"]
 
+# used by XGBoost to handle class imbalance:
+# ratio of negative (legitimate) to positive (phishing) samples
+n_legitimate = (Y == 0).sum()
+n_phishing = (Y == 1).sum()
+scale_pos_weight = n_legitimate / n_phishing
+
 # splitting the data into training and testing sets
 x_train, x_test, y_train, y_test = train_test_split(
     X, Y, test_size=0.2, random_state=10, stratify=Y
@@ -51,10 +60,14 @@ rf_model = RandomForestClassifier(n_estimators=60, random_state=10)
 dt_model = tree.DecisionTreeClassifier(random_state=10)
 ab_model = AdaBoostClassifier(random_state=10)
 nb_model = GaussianNB()
+lr_model = LogisticRegression(class_weight='balanced', max_iter=1000, random_state=10)
+xgb_model = XGBClassifier(
+    scale_pos_weight=scale_pos_weight,
+    eval_metric='logloss',
+    random_state=10
+)
 
-# ---------------------------------------------------------
-# Single train/test split evaluation (SVM only, as before)
-# ---------------------------------------------------------
+# Single train/test split evaluation for SVM only 
 svm_model.fit(x_train, y_train)
 predictions = svm_model.predict(x_test)
 
@@ -78,11 +91,7 @@ print("Precision: ", precision)
 print("Recall: ", recall)
 print("F1-Score: ", f1)
 
-# ---------------------------------------------------------
-# K-fold cross validation (stratified, so every fold has
-# a proportional mix of both classes -- avoids the
-# "only one class in training data" crash)
-# ---------------------------------------------------------
+# K-fold cross validation (every fold has a proportional mix of both classes)
 K = 5
 skf = StratifiedKFold(n_splits=K, shuffle=True, random_state=10)
 
@@ -91,6 +100,8 @@ rf_accuracy_list, rf_precision_list, rf_recall_list = [], [], []
 dt_accuracy_list, dt_precision_list, dt_recall_list = [], [], []
 ab_accuracy_list, ab_precision_list, ab_recall_list = [], [], []
 nb_accuracy_list, nb_precision_list, nb_recall_list = [], [], []
+lr_accuracy_list, lr_precision_list, lr_recall_list = [], [], []
+xgb_accuracy_list, xgb_precision_list, xgb_recall_list = [], [], []
 
 
 def calculate_measures(TN, TP, FN, FP):
@@ -149,6 +160,24 @@ for train_index, test_index in skf.split(X, Y):
     nb_precision_list.append(nb_precision)
     nb_recall_list.append(nb_recall)
 
+    # ----- LOGISTIC REGRESSION (own addition) ----- #
+    lr_model.fit(X_train_fold, Y_train_fold)
+    lr_predictions = lr_model.predict(X_test_fold)
+    tn, fp, fn, tp = confusion_matrix(Y_test_fold, lr_predictions).ravel()
+    lr_accuracy, lr_precision, lr_recall = calculate_measures(tn, tp, fn, fp)
+    lr_accuracy_list.append(lr_accuracy)
+    lr_precision_list.append(lr_precision)
+    lr_recall_list.append(lr_recall)
+
+    # ----- XGBOOST (own addition) ----- #
+    xgb_model.fit(X_train_fold, Y_train_fold)
+    xgb_predictions = xgb_model.predict(X_test_fold)
+    tn, fp, fn, tp = confusion_matrix(Y_test_fold, xgb_predictions).ravel()
+    xgb_accuracy, xgb_precision, xgb_recall = calculate_measures(tn, tp, fn, fp)
+    xgb_accuracy_list.append(xgb_accuracy)
+    xgb_precision_list.append(xgb_precision)
+    xgb_recall_list.append(xgb_recall)
+
 
 print("\n--- 5-Fold Cross Validation Results ---")
 
@@ -186,3 +215,78 @@ NB_recall = sum(nb_recall_list) / len(nb_recall_list)
 print("Gaussian Naive Bayes accuracy ==> ", NB_accuracy)
 print("Gaussian Naive Bayes precision ==> ", NB_precision)
 print("Gaussian Naive Bayes recall ==> ", NB_recall)
+
+LR_accuracy = sum(lr_accuracy_list) / len(lr_accuracy_list)
+LR_precision = sum(lr_precision_list) / len(lr_precision_list)
+LR_recall = sum(lr_recall_list) / len(lr_recall_list)
+print("Logistic Regression accuracy ==> ", LR_accuracy)
+print("Logistic Regression precision ==> ", LR_precision)
+print("Logistic Regression recall ==> ", LR_recall)
+
+XGB_accuracy = sum(xgb_accuracy_list) / len(xgb_accuracy_list)
+XGB_precision = sum(xgb_precision_list) / len(xgb_precision_list)
+XGB_recall = sum(xgb_recall_list) / len(xgb_recall_list)
+print("XGBoost accuracy ==> ", XGB_accuracy)
+print("XGBoost precision ==> ", XGB_precision)
+print("XGBoost recall ==> ", XGB_recall)
+
+
+# Results comparison table + bar chart
+data = {
+    'accuracy': [NB_accuracy, SVM_accuracy, DT_accuracy, RF_accuracy, AB_accuracy, LR_accuracy, XGB_accuracy],
+    'precision': [NB_precision, SVM_precision, DT_precision, RF_precision, AB_precision, LR_precision, XGB_precision],
+    'recall': [NB_recall, SVM_recall, DT_recall, RF_recall, AB_recall, LR_recall, XGB_recall],
+}
+
+index = ['NB', 'SVM', 'DT', 'RF', 'AB', 'LR', 'XGB']
+
+df_results = pd.DataFrame(data=data, index=index)
+print("\n--- Results Summary ---")
+print(df_results)
+
+# visualize the dataframe
+# ax = df_results.plot.bar(rot=0)
+plt.title("Model Comparison — 5-Fold Cross Validation")
+plt.ylabel("Score")
+# plt.tight_layout()
+# plt.savefig("model_comparison.png")
+# plt.show()
+
+# ---------------------------------------------------------
+#using all models in streamlit app
+import joblib
+ 
+all_models = {
+    "Naive Bayes": nb_model,
+    "SVM": svm_model,
+    "Decision Tree": dt_model,
+    "Random Forest": rf_model,
+    "AdaBoost": ab_model,
+    "Logistic Regression": lr_model,
+    "XGBoost": xgb_model,
+}
+ 
+# retrain every model on the FULL dataset (not just one fold) before saving
+for name, m in all_models.items():
+    m.fit(X, Y)
+ 
+joblib.dump(all_models, "all_models.pkl")
+joblib.dump(list(X.columns), "feature_columns.pkl")
+ 
+# also record which model performed best in cross-validation,
+# based on recall (most important metric for a security tool)
+cv_recall_scores = {
+    "Naive Bayes": NB_recall,
+    "SVM": SVM_recall,
+    "Decision Tree": DT_recall,
+    "Random Forest": RF_recall,
+    "AdaBoost": AB_recall,
+    "Logistic Regression": LR_recall,
+    "XGBoost": XGB_recall,
+}
+best_model_name = max(cv_recall_scores, key=cv_recall_scores.get)
+joblib.dump(best_model_name, "best_model_name.pkl")
+ 
+print(f"\nAll 7 models saved to all_models.pkl")
+print(f"Feature column order saved to feature_columns.pkl")
+print(f"Best model by recall: {best_model_name} ({cv_recall_scores[best_model_name]:.3f})")
