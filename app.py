@@ -6,62 +6,54 @@ import features as fe
 import pandas as pd
 import time
 
-
-# ── Page config ──────────────────────────────────────────
 st.set_page_config(
     page_title="PhishGuard | AI Phishing Detector",
     page_icon="🛡️",
     layout="centered",
 )
 
-
-# ── Custom CSS ───────────────────────────────────────────
-st.markdown("""
-<style>
-    .main {
-        background-color: #0e1117;
-    }
+st.markdown(
+    """
+    <style>
 
     .title-text {
-        font-size: 2.8rem;
-        font-weight: 800;
+        font-size: 3rem;
+        font-weight: 700;
         text-align: center;
-        background: linear-gradient(90deg, #00d4ff, #7b2ff7);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0px;
+        margin-bottom: 0.2rem;
     }
 
     .subtitle-text {
         text-align: center;
         color: #8b949e;
-        font-size: 1.05rem;
-        margin-top: 0px;
+        font-size: 1.1rem;
         margin-bottom: 2rem;
     }
 
-    .result-card-safe {
-        background: linear-gradient(135deg, #0f3d2e, #0a1f18);
-        border: 1px solid #2ea043;
-        border-radius: 16px;
-        padding: 2rem;
+    .result-card-danger {
+        background-color: #2d1616;
+        border: 1px solid #f85149;
+        border-radius: 15px;
+        padding: 1.5rem;
         text-align: center;
-        margin-top: 1.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
     }
 
-    .result-card-danger {
-        background: linear-gradient(135deg, #3d0f0f, #1f0a0a);
-        border: 1px solid #f85149;
-        border-radius: 16px;
-        padding: 2rem;
+    .result-card-safe {
+        background-color: #13261a;
+        border: 1px solid #2ea043;
+        border-radius: 15px;
+        padding: 1.5rem;
         text-align: center;
-        margin-top: 1.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
     }
 
     .result-title {
         font-size: 1.8rem;
         font-weight: 700;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.5rem;
     }
 
     .confidence-text {
@@ -69,47 +61,84 @@ st.markdown("""
         font-size: 0.95rem;
     }
 
-    .stTextInput input {
-        border-radius: 10px;
-        border: 1px solid #30363d;
-        padding: 0.7rem;
-        font-size: 1rem;
-    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    div.stButton > button {
-        width: 100%;
-        border-radius: 10px;
-        background: linear-gradient(90deg, #00d4ff, #7b2ff7);
-        color: white;
-        font-weight: 600;
-        padding: 0.6rem;
-        border: none;
-        transition: 0.2s;
-    }
-
-    div.stButton > button:hover {
-        opacity: 0.85;
-        border: none;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ── Header ───────────────────────────────────────────────
 st.markdown(
     '<p class="title-text">🛡️ PhishGuard</p>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<p class="subtitle-text">'
-    'Phishing Website Detector — content-based machine learning analysis'
-    '</p>',
-    unsafe_allow_html=True,
+    '<p class="subtitle-text">Phishing Website Detector — content-based machine learning analysis</p>',
+    unsafe_allow_html=True
 )
 
 
-# ── Load models ──────────────────────────────────────────
+# ============================================================
+# PROJECT DETAILS
+# ============================================================
+
+with st.expander("📚 PROJECT DETAILS", expanded=False):
+
+    st.markdown(
+        """
+        ### Approach
+
+        PhishGuard is a supervised machine learning application designed to classify websites as legitimate or potentially phishing based on features extracted from their HTML content.
+
+        The application uses a content-based approach. The URL entered by the user is only used to retrieve the webpage. The classification itself is performed using features extracted from the webpage's HTML structure and content.
+
+        The HTML is retrieved using the Requests library and parsed using BeautifulSoup. The extracted features are then passed to the trained machine learning models.
+
+        ### Machine Learning Models
+
+        Seven supervised classification models were evaluated using stratified 5-fold cross-validation:
+
+        - **NB** — Gaussian Naive Bayes
+        - **SVM** — Linear Support Vector Machine
+        - **DT** — Decision Tree
+        - **RF** — Random Forest
+        - **AB** — AdaBoost
+        - **LR** — Logistic Regression
+        - **XGB** — XGBoost
+
+        ### Dataset
+
+        The dataset contains **26,585 website samples**, consisting of **16,061 legitimate websites** and **10,524 phishing websites**.
+
+        Each website is represented using structured features extracted from its webpage content, with:
+
+        - **0** → Legitimate
+        - **1** → Phishing
+
+        ### Content-Based Features
+
+        The model does not classify a website based on the URL string itself. Instead, it uses features extracted from the webpage after retrieving and parsing its HTML content.
+
+        Examples of content-related characteristics include HTML elements, forms, links, scripts, iframes, and other structural properties used by the feature extraction process.
+
+        💡
+
+        The URL is only the location used to retrieve the webpage. It is not itself used as a classification feature.
+
+        ### Evaluation
+
+        The models were evaluated using stratified 5-fold cross-validation. Accuracy, precision, and recall were calculated for each fold and then averaged to compare model performance.
+
+        ### Cross-Validation Results
+
+        The trained models are available in the application and can be compared using the model selection options below.
+        """
+    )
+
+
+# ============================================================
+# LOAD TRAINED MODELS
+# ============================================================
+
 @st.cache_resource
 def load_models():
     models = joblib.load("all_models.pkl")
@@ -124,128 +153,30 @@ try:
 except FileNotFoundError:
     model_ready = False
     st.error(
-        "⚠️ Model files not found. "
-        "Run `machine_learning.py` first to generate the required model files."
+        "⚠️ Model files not found. Run `machine_learning.py` first to generate `all_models.pkl`."
     )
 
 
-# ── Project Details ─────────────────────────────────────
-with st.expander("📚 PROJECT DETAILS"):
+# ============================================================
+# ANALYZE A WEBSITE
+# ============================================================
 
-    st.subheader("Approach")
+st.markdown("### 🔍 Analyze a Website")
 
-    st.write(
-        "PhishGuard is a supervised machine learning application designed "
-        "to classify websites as legitimate or potentially phishing based "
-        "on features extracted from their HTML content."
-    )
-
-    st.write(
-        "The application uses a content-based approach. "
-        "The URL entered by the user is only used to retrieve the webpage. "
-        "The classification itself is performed using features extracted "
-        "from the webpage's HTML structure and content."
-    )
-
-    st.write(
-        "The HTML is retrieved using the Requests library and parsed using "
-        "BeautifulSoup. The extracted features are then passed to the "
-        "trained machine learning models."
-    )
-
-    st.subheader("Machine Learning Models")
-
-    st.write(
-        "Seven supervised classification models were evaluated using "
-        "stratified 5-fold cross-validation:"
-    )
-
-    st.markdown("""
-    - **NB** — Gaussian Naive Bayes
-    - **SVM** — Linear Support Vector Machine
-    - **DT** — Decision Tree
-    - **RF** — Random Forest
-    - **AB** — AdaBoost
-    - **LR** — Logistic Regression
-    - **XGB** — XGBoost
-    """)
-
-    st.subheader("Dataset")
-
-    st.write(
-        "The dataset contains **26,585 website samples**, consisting of "
-        "**16,061 legitimate websites** and **10,524 phishing websites**."
-    )
-
-    st.write(
-        "Each website is represented using structured features extracted "
-        "from its webpage content, with:"
-    )
-
-    st.markdown("""
-    - **0** → Legitimate
-    - **1** → Phishing
-    """)
-
-    st.subheader("Content-Based Features")
-
-    st.write(
-        "The model does not classify a website based on the URL string itself. "
-        "Instead, it uses features extracted from the webpage after retrieving "
-        "and parsing its HTML content."
-    )
-
-    st.write(
-        "Examples of content-related characteristics include HTML elements, "
-        "forms, links, scripts, iframes, and other structural properties "
-        "used by the feature extraction process."
-    )
-
-    st.info(
-        "💡 The URL is only the location used to retrieve the webpage. "
-        "It is not itself used as a classification feature."
-    )
-
-    st.subheader("Evaluation")
-
-    st.write(
-        "The models were evaluated using stratified 5-fold cross-validation. "
-        "Accuracy, precision, and recall were calculated for each fold and "
-        "then averaged to compare model performance."
-    )
-
-    if model_ready:
-        st.subheader("Cross-Validation Results")
-
-        # Display results if they were saved with the models
-        # Otherwise this section can be removed.
-        st.write(
-            "The trained models are available in the application and can "
-            "be compared using the model selection options below."
-        )
-
-
-# ── Analysis mode ────────────────────────────────────────
-st.subheader("🔍 Analyze a Website")
-
-st.caption(
-    "Enter a webpage URL. PhishGuard will retrieve its HTML and analyze "
-    "its content-based features."
+st.write(
+    "Enter a webpage URL. PhishGuard will retrieve its HTML and analyze its content-based features."
 )
+
 
 url = st.text_input(
     "",
-    placeholder="🔗  Paste a webpage URL, e.g. https://example.com"
+    placeholder="🔗  Paste a URL to analyze, e.g. https://example.com"
 )
 
 
 mode = st.radio(
     "How should this be analyzed?",
-    [
-        "🏆 Best model only",
-        "🎯 Choose a specific model",
-        "📊 Run all models"
-    ],
+    ["🏆 Best model only", "🎯 Choose a specific model", "📊 Run all models"],
     horizontal=True,
 )
 
@@ -265,13 +196,13 @@ analyze = st.button(
 )
 
 
-# ── Scraping ─────────────────────────────────────────────
+# ============================================================
+# SCRAPE URL
+# ============================================================
+
 def scrape_url(url):
     headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36"
-        )
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
     try:
@@ -291,76 +222,54 @@ def scrape_url(url):
         return None
 
 
-# ── Feature extraction ──────────────────────────────────
+# ============================================================
+# BUILD FEATURE VECTOR
+# ============================================================
+
 def build_feature_vector(html, url, feature_columns):
     soup = BeautifulSoup(html, "html.parser")
-
-    # The URL is supplied here only because the existing feature
-    # extraction function expects it. Make sure create_vector()
-    # itself does NOT extract URL-based features.
     vector = fe.create_vector(soup, url)
-
-    df = pd.DataFrame(
-        [vector],
-        columns=feature_columns
-    )
-
+    df = pd.DataFrame([vector], columns=feature_columns)
     return df
 
 
-# ── Result rendering ────────────────────────────────────
+# ============================================================
+# RESULT CARD
+# ============================================================
+
 def render_result_card(model_name, prediction, confidence):
 
     if prediction == 1:
 
+        confidence_text = (
+            f" · Confidence: {confidence:.1f}%"
+            if confidence is not None
+            else ""
+        )
+
         st.markdown(
-            f"""
-            <div class="result-card-danger">
-                <div style="font-size: 3rem;">🚨</div>
-
-                <div class="result-title"
-                     style="color:#f85149;">
-                    Potential Phishing Website
-                </div>
-
-                <div class="confidence-text">
-                    {model_name}
-                    {
-                        " · Confidence: " + f"{confidence:.1f}%"
-                        if confidence else ""
-                    }
-                </div>
-            </div>
-            """,
+            f"""<div class="result-card-danger"><div style="font-size: 3rem;">🚨</div><div class="result-title" style="color:#f85149;">Phishing Detected</div><div class="confidence-text">{model_name}{confidence_text}</div></div>""",
             unsafe_allow_html=True
         )
 
     else:
 
+        confidence_text = (
+            f" · Confidence: {confidence:.1f}%"
+            if confidence is not None
+            else ""
+        )
+
         st.markdown(
-            f"""
-            <div class="result-card-safe">
-                <div style="font-size: 3rem;">✅</div>
-
-                <div class="result-title"
-                     style="color:#2ea043;">
-                    Looks Legitimate
-                </div>
-
-                <div class="confidence-text">
-                    {model_name}
-                    {
-                        " · Confidence: " + f"{confidence:.1f}%"
-                        if confidence else ""
-                    }
-                </div>
-            </div>
-            """,
+            f"""<div class="result-card-safe"><div style="font-size: 3rem;">✅</div><div class="result-title" style="color:#2ea043;">Looks Legitimate</div><div class="confidence-text">{model_name}{confidence_text}</div></div>""",
             unsafe_allow_html=True
         )
 
 
-# ── Prediction ───────────────────────────────────────────
+# ============================================================
+# PREDICT
+# ============================================================
+
 def predict_with(model, X_input):
 
     prediction = model.predict(X_input)[0]
@@ -368,15 +277,16 @@ def predict_with(model, X_input):
     confidence = None
 
     if hasattr(model, "predict_proba"):
-
         proba = model.predict_proba(X_input)[0]
-
         confidence = proba[int(prediction)] * 100
 
     return prediction, confidence
 
 
-# ── Run analysis ─────────────────────────────────────────
+# ============================================================
+# ANALYSIS
+# ============================================================
+
 if analyze:
 
     if not url.strip():
@@ -388,9 +298,7 @@ if analyze:
         if not url.startswith(("http://", "https://")):
             url = "https://" + url
 
-        with st.spinner(
-            "🔍 Retrieving webpage and extracting content features..."
-        ):
+        with st.spinner("🔍 Scraping page and extracting features..."):
 
             time.sleep(0.4)
 
@@ -399,16 +307,12 @@ if analyze:
         if html is None:
 
             st.error(
-                "❌ Couldn't retrieve that webpage. "
-                "It may be unavailable, blocking automated requests, "
-                "or the URL may be invalid."
+                "❌ Couldn't reach that URL. It may be down, blocking automated requests, or the link is invalid."
             )
 
         else:
 
-            with st.spinner(
-                "🧠 Analyzing webpage content..."
-            ):
+            with st.spinner("🧠 Running through the model..."):
 
                 time.sleep(0.4)
 
@@ -419,7 +323,10 @@ if analyze:
                 )
 
 
-            # ── Best model ──────────────────────────────
+            # =================================================
+            # BEST MODEL
+            # =================================================
+
             if mode == "🏆 Best model only":
 
                 model = all_models[best_model_name]
@@ -435,8 +342,13 @@ if analyze:
                     confidence
                 )
 
+                is_phishing_verdict = prediction == 1
 
-            # ── Selected model ──────────────────────────
+
+            # =================================================
+            # SPECIFIC MODEL
+            # =================================================
+
             elif mode == "🎯 Choose a specific model":
 
                 model = all_models[selected_model_name]
@@ -452,11 +364,16 @@ if analyze:
                     confidence
                 )
 
+                is_phishing_verdict = prediction == 1
 
-            # ── All models ──────────────────────────────
+
+            # =================================================
+            # ALL MODELS
+            # =================================================
+
             else:
 
-                st.markdown("#### Results Across All Models")
+                st.markdown("#### Results across all models")
 
                 rows = []
 
@@ -470,7 +387,7 @@ if analyze:
                     )
 
                     verdict = (
-                        "🚨 Potential Phishing"
+                        "🚨 Phishing"
                         if prediction == 1
                         else "✅ Legitimate"
                     )
@@ -483,11 +400,12 @@ if analyze:
                             "Verdict": verdict,
                             "Confidence": (
                                 f"{confidence:.1f}%"
-                                if confidence
+                                if confidence is not None
                                 else "—"
                             ),
                         }
                     )
+
 
                 results_df = pd.DataFrame(rows)
 
@@ -497,80 +415,59 @@ if analyze:
                     hide_index=True
                 )
 
+
+                # =================================================
+                # CONSENSUS
+                # =================================================
+
                 total = len(all_models)
 
-                consensus = (
-                    "🚨 Potential Phishing"
-                    if phishing_votes > total / 2
-                    else "✅ Legitimate"
-                )
-
-                st.markdown(
-                    f"""
-                    <div class="{
-                        'result-card-danger'
-                        if phishing_votes > total / 2
-                        else 'result-card-safe'
-                    }">
-
-                        <div style="font-size: 2rem;">
-                            {consensus}
-                        </div>
-
-                        <div class="confidence-text">
-                            Consensus:
-                            {phishing_votes}/{total}
-                            models flagged this website as phishing
-                        </div>
-
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+                is_phishing_consensus = (
+                    phishing_votes > total / 2
                 )
 
 
-            # ── Caption ─────────────────────────────────
-            if mode == "📊 Run all models":
+                if is_phishing_consensus:
 
-                is_phishing_verdict = (
-                    phishing_votes > len(all_models) / 2
-                )
+                    st.markdown(
+                        f"""<div class="result-card-danger"><div style="font-size: 2rem;">🚨 Potential Phishing</div><div class="confidence-text">Consensus: {phishing_votes}/{total} models flagged this website as phishing</div></div>""",
+                        unsafe_allow_html=True
+                    )
 
-            else:
+                else:
 
-                is_phishing_verdict = prediction == 1
+                    st.markdown(
+                        f"""<div class="result-card-safe"><div style="font-size: 2rem;">✅ Legitimate</div><div class="confidence-text">Consensus: {phishing_votes}/{total} models flagged this website as phishing</div></div>""",
+                        unsafe_allow_html=True
+                    )
 
+
+                is_phishing_verdict = is_phishing_consensus
+
+
+            # =================================================
+            # FINAL MESSAGE
+            # =================================================
 
             if not is_phishing_verdict:
 
                 st.caption(
-                    "No strong phishing indicators were detected in the "
-                    "analyzed webpage content. This does not guarantee that "
-                    "the website is safe."
+                    "No strong phishing indicators found — but always stay cautious with unfamiliar sites."
                 )
 
             else:
 
                 st.caption(
-                    "⚠️ The webpage contains structural patterns commonly "
-                    "associated with phishing websites. Avoid entering "
-                    "personal or sensitive information."
+                    "⚠️ This site shows structural patterns commonly associated with phishing. Avoid entering personal information."
                 )
 
 
-            # ── Feature display ─────────────────────────
-            with st.expander("🔬 See Extracted Content Features"):
+# ============================================================
+# FOOTER
+# ============================================================
 
-                st.dataframe(
-                    X_input.T.rename(columns={0: "Value"}),
-                    use_container_width=True
-                )
-
-
-# ── Footer ───────────────────────────────────────────────
 st.markdown("---")
 
 st.caption(
-    "Built with scikit-learn, XGBoost, BeautifulSoup & Streamlit "
-    "· Content-based phishing website detection"
+    "Built with scikit-learn, XGBoost, BeautifulSoup & Streamlit · Content-based phishing website detection"
 )
