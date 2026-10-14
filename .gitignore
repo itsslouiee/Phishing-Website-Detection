@@ -16,4 +16,4 @@ env/
 *.log
 
 # Dataset / large generated content
-archive/dataset/
+/archive/dataset/
