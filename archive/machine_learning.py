@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn import svm, tree
@@ -253,9 +254,12 @@ plt.ylabel("Score")
 # plt.show()
 
 # ---------------------------------------------------------
-#using all models in streamlit app
+# using all models in streamlit app
 import joblib
- 
+
+artifact_dir = Path(__file__).resolve().parent / "model_artifacts"
+artifact_dir.mkdir(exist_ok=True)
+
 all_models = {
     "Naive Bayes": nb_model,
     "SVM": svm_model,
@@ -265,14 +269,14 @@ all_models = {
     "Logistic Regression": lr_model,
     "XGBoost": xgb_model,
 }
- 
+
 # retrain every model on the FULL dataset (not just one fold) before saving
 for name, m in all_models.items():
     m.fit(X, Y)
- 
-joblib.dump(all_models, "all_models.pkl")
-joblib.dump(list(X.columns), "feature_columns.pkl")
- 
+
+joblib.dump(all_models, artifact_dir / "all_models.pkl")
+joblib.dump(list(X.columns), artifact_dir / "feature_columns.pkl")
+
 # also record which model performed best in cross-validation,
 # based on recall (most important metric for a security tool)
 cv_recall_scores = {
@@ -285,8 +289,8 @@ cv_recall_scores = {
     "XGBoost": XGB_recall,
 }
 best_model_name = max(cv_recall_scores, key=cv_recall_scores.get)
-joblib.dump(best_model_name, "best_model_name.pkl")
- 
-print(f"\nAll 7 models saved to all_models.pkl")
-print(f"Feature column order saved to feature_columns.pkl")
+joblib.dump(best_model_name, artifact_dir / "best_model_name.pkl")
+
+print(f"\nAll 7 models saved to {artifact_dir / 'all_models.pkl'}")
+print(f"Feature column order saved to {artifact_dir / 'feature_columns.pkl'}")
 print(f"Best model by recall: {best_model_name} ({cv_recall_scores[best_model_name]:.3f})")
