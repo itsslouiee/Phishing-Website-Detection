@@ -22,8 +22,8 @@ data_frame = pd.read_csv(URL_file_name)
 URL_list = data_frame['URL'].to_list()
 
 # restrict the URL count
-begin = 1500
-end = 8000
+begin = 0
+end = 50000
 
 # for legitimate urls
 #tag = "http://"
@@ -98,6 +98,11 @@ columns = [
     'number_of_sources',
     'number_of_span',
     'number_of_table',
+    'url_length',
+    'qty_dots',
+    'qty_hyphens',
+    'has_ip_address',
+    'has_https',
     'URL'
 ]
 

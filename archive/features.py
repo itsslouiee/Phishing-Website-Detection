@@ -1,3 +1,7 @@
+import re
+from urllib.parse import urlparse
+
+
 # BINARY FEATURES (return 0 or 1)
 def has_title(soup):
     if soup.title is None:
@@ -205,35 +209,38 @@ def number_of_table(soup):
     return len(soup.find_all("table"))
 
 
-# i removed it because i encoutered some errors with it
 # LEXICAL FEATURES
 
-# def url_length(url):
-#     return len(url)
+def url_length(url):
+    return len(url or "")
 
 
-# def qty_dots(url):
-#     return url.count('.')
+def qty_dots(url):
+    return (url or "").count('.')
 
 
-# def qty_hyphens(url):
-#     return url.count('-')
+def qty_hyphens(url):
+    return (url or "").count('-')
 
 
-# def has_ip_address(url):
-#     domain = urlparse(url).netloc
-#     domain = domain.split(':')[0]  # strip port if present
+def has_ip_address(url):
+    if not url:
+        return 0
 
-#     ipv4_pattern = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
-#     match = ipv4_pattern.match(domain)
-#     if match:
-#         if all(0 <= int(octet) <= 255 for octet in match.groups()):
-#             return 1
-#     return 0
+    parsed = urlparse(url)
+    domain = (parsed.netloc or parsed.path).split(':')[0]
+    if not domain:
+        return 0
+
+    ipv4_pattern = re.compile(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
+    match = ipv4_pattern.match(domain)
+    if match and all(0 <= int(octet) <= 255 for octet in match.groups()):
+        return 1
+    return 0
 
 
-# def has_https(url):
-#     return 1 if url.startswith("https://") else 0
+def has_https(url):
+    return 1 if isinstance(url, str) and url.startswith("https://") else 0
 
 def create_vector(soup, url):
     return [
@@ -279,5 +286,10 @@ def create_vector(soup, url):
         has_picture(soup),
         number_of_sources(soup),
         number_of_span(soup),
-        number_of_table(soup)
+        number_of_table(soup),
+        url_length(url),
+        qty_dots(url),
+        qty_hyphens(url),
+        has_ip_address(url),
+        has_https(url)
     ]
