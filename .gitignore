@@ -17,3 +17,5 @@ env/
 
 # Dataset / large generated content
 /archive/dataset/
+/archive/model_artifacts/
+*.pkl
