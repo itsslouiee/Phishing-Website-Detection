@@ -8,15 +8,17 @@ import tldextract
 import logging
 import re
 import ipaddress
-import Additional_Common_Methods as acm
+from . import Additional_Common_Methods as acm
 import csv
 import pickle
 from Levenshtein import distance 
 from thefuzz import fuzz
+from pathlib import Path
+BASE_DIR = Path(__file__).parent
 #file_path_su = r"Feature Extraction\shortUrls.txt" 
 #file_path_fhs = r"Feature Extraction\free_hosting_services.txt" 
-file_path_su = r"shortUrls.txt" 
-file_path_fhs = r"free_hosting_services.txt" 
+file_path_su = BASE_DIR / "shortUrls.txt"
+file_path_fhs = BASE_DIR / "free_hosting_services.txt"
 
 
 #function to read brand names file
@@ -32,7 +34,7 @@ def read_brand_names_from_csv (file_path, column_index):
 # %%
 #calling the fucntion to append csv file data of brands to a list 
 
-brand_names_file = "sample_brands_new.csv"
+brand_names_file = BASE_DIR / "sample_brands_new.csv"
 brand_names_column = 0  
 brand_names = read_brand_names_from_csv(brand_names_file, brand_names_column)
 
@@ -548,8 +550,7 @@ def get_hostname(url):
     return hostname.lower()
 
 #function to detect gibbereish in domain of length>=10
-model_data = pickle.load(open('gib_model.pki', 'rb'))
-
+model_data = pickle.load(open(BASE_DIR / 'gib_model.pki', 'rb'))
 def normalize(line):
     """ Return only the subset of chars from accepted_chars.
     This helps keep the  model relatively small by ignoring punctuation, 
