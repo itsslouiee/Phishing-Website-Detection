@@ -19,3 +19,6 @@ env/
 /archive/dataset/
 /archive/model_artifacts/
 *.pkl
+
+#
+All_Features_threshold90.xlsx
