@@ -1,0 +1,8 @@
+pandas
+scikit-learn
+beautifulsoup4
+tldextract
+python-Levenshtein
+thefuzz
+requests
+selenium
