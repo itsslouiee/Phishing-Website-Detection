@@ -1,18 +1,17 @@
+import os
+import joblib
 import pandas as pd
 
-from sklearn.model_selection import train_test_split, StratifiedKFold
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score
-)
+from sklearn.model_selection import train_test_split
 
-from logistic_regression import create_model
+import logistic_regression
+import random_forest
+import xg_boost
 from evaluation import evaluate_model
+from cross_validation import cross_validate
 
 # 1. Load dataset
-df = pd.read_csv("data.csv")
+df = pd.read_csv("original_data.csv")
 
 print("Original dataset:")
 print("Total rows:", df.shape[0])
@@ -21,6 +20,7 @@ print("Total columns:", df.shape[1])
 print("\nClass distribution:")
 print(df["label"].value_counts())
 
+# 2. Remove duplicate website records
 df = df.drop_duplicates(subset=["url"] + [
     col for col in df.columns
     if col not in ["serial_number", "url"]
@@ -28,13 +28,10 @@ df = df.drop_duplicates(subset=["url"] + [
 
 print("\nAfter removing duplicate website records:")
 print("Total rows:", df.shape[0])
-
-print("\nClass distribution after removing duplicates:")
 print(df["label"].value_counts())
 
-
-# 3. Separate features and target
-# URL and serial_number are identifiers, not model features
+# 3. Separate features (X) and target (Y)
+# url and serial_number are identifiers, not features
 X = df.drop(["url", "serial_number", "label"], axis=1)
 Y = df["label"]
 
@@ -49,60 +46,73 @@ x_train, x_test, y_train, y_test = train_test_split(
     stratify=Y
 )
 
-print("\nTraining samples:", x_train.shape[0])
-print("Testing samples:", x_test.shape[0])
+# XGBoost needs to know how imbalanced the classes are
+scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
 
-# 5. Create Logistic Regression model
-lr_model = create_model()
+# 5. The models we want to train
+# name -> (function that builds a fresh model, file name for the .pkl)
+models_to_train = {
+    "Logistic Regression": (
+        logistic_regression.create_model,
+        "logistic_regression.pkl"
+    ),
+    "Random Forest": (
+        random_forest.create_model,
+        "random_forest.pkl"
+    ),
+    "XGBoost": (
+        lambda: xg_boost.create_model(scale_pos_weight),
+        "xgboost.pkl"
+    ),
+}
 
-# 6. Single train/test split evaluation
-lr_model.fit(x_train, y_train)
+os.makedirs("models", exist_ok=True)
 
-print("\nSingle Split (Logistic Regression)")
-evaluate_model(lr_model, x_test, y_test)
+summary = []
 
-# 7. Stratified 5-fold cross-validation
-K = 5
+for name, (build_model, file_name) in models_to_train.items():
 
-skf = StratifiedKFold(
-    n_splits=K,
-    shuffle=True,
-    random_state=10
-)
+    print("\n" + "=" * 50)
+    print(name)
+    print("=" * 50)
 
-accuracy_list = []
-precision_list = []
-recall_list = []
-f1_list = []
+    # 6. Single train/test split evaluation
+    model = build_model()
+    model.fit(x_train, y_train)
 
-for fold, (train_index, test_index) in enumerate(
-    skf.split(X, Y), start=1
-):
-    X_train_fold = X.iloc[train_index]
-    X_test_fold = X.iloc[test_index]
-    Y_train_fold = Y.iloc[train_index]
-    Y_test_fold = Y.iloc[test_index]
+    print("\nSingle split:")
+    evaluate_model(model, x_test, y_test)
 
-    lr_model.fit(X_train_fold, Y_train_fold)
-    fold_predictions = lr_model.predict(X_test_fold)
+    # 7. Stratified 5-fold cross-validation (see cross_validation.py)
+    cv = cross_validate(build_model, X, Y, k=5)
 
-    accuracy_list.append(accuracy_score(Y_test_fold, fold_predictions))
-    precision_list.append(
-        precision_score(Y_test_fold, fold_predictions, zero_division=0)
-    )
-    recall_list.append(
-        recall_score(Y_test_fold, fold_predictions, zero_division=0)
-    )
-    f1_list.append(f1_score(Y_test_fold, fold_predictions, zero_division=0))
+    print("\n5-Fold Cross-Validation (mean):")
+    print("Accuracy: ", round(cv["Accuracy"], 4))
+    print("Precision:", round(cv["Precision"], 4))
+    print("Recall:   ", round(cv["Recall"], 4))
+    print("F1-Score: ", round(cv["F1"], 4))
 
-    print(f"\nFold {fold}:")
-    print("Accuracy:", round(accuracy_list[-1], 4))
-    print("Precision:", round(precision_list[-1], 4))
-    print("Recall:", round(recall_list[-1], 4))
-    print("F1-Score:", round(f1_list[-1], 4))
+    summary.append({"Model": name, **cv})
 
-print("\n5-Fold Cross-Validation Results")
-print("Mean Accuracy:", round(sum(accuracy_list) / K, 4))
-print("Mean Precision:", round(sum(precision_list) / K, 4))
-print("Mean Recall:", round(sum(recall_list) / K, 4))
-print("Mean F1-Score:", round(sum(f1_list) / K, 4))
+    # 8. Train the final model on ALL the data and save it
+    final_model = build_model()
+    final_model.fit(X, Y)
+
+    joblib.dump(final_model, os.path.join("models", file_name))
+    print(f"\nSaved to models/{file_name}")
+
+# 9. Save the feature column order (the app needs it) and the best model
+joblib.dump(list(X.columns), os.path.join("models", "feature_columns.pkl"))
+
+summary_df = pd.DataFrame(summary).set_index("Model")
+print("\n" + "=" * 50)
+print("Summary (5-fold cross-validation)")
+print("=" * 50)
+print(summary_df.round(4))
+
+# Save the summary table to a CSV file
+summary_df.round(4).to_csv("results_summary.csv")
+
+best_model_name = summary_df["F1"].idxmax()
+joblib.dump(best_model_name, os.path.join("models", "best_model_name.pkl"))
+print("\nBest model by F1-score:", best_model_name)
