@@ -2,7 +2,7 @@
 
 Run from the project root (the folder that contains feature_extraction/ and data.csv):
 
-    python validate_html_features.py --data data.csv --html-dir /home/louisa/All_HTML --n 500
+    python validate_html_features.py --data original_data.csv --html-dir /home/louisa/All_HTML --n 500
 
 What it does:
   1. Takes a random sample of rows from data.csv (half phishing, half legitimate).
@@ -48,7 +48,7 @@ def same(a, b):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="data.csv")
+    ap.add_argument("--data", default="original_data.csv")
     ap.add_argument("--html-dir", required=True)
     ap.add_argument("--n", type=int, default=500, help="total rows to test")
     ap.add_argument("--seed", type=int, default=10)
