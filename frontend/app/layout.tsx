@@ -3,19 +3,13 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '[PROJECT NAME] — Know before you click',
-  description: 'A machine-learning-powered phishing website detection platform.',
+  title: 'Phishing Website Detection',
+  description: 'Check before you click: analyze suspicious URLs with machine learning to help identify potential phishing websites.',
+  generator: 'v0.app',
 }
 
-export const viewport: Viewport = { colorScheme: 'dark', themeColor: '#0B1020', userScalable: false }
+export const viewport: Viewport = { colorScheme: 'dark', themeColor: '#0B1020' }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="antialiased" suppressHydrationWarning>
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
-      </body>
-    </html>
-  )
+  return <html lang="en"><body className="antialiased">{children}{process.env.NODE_ENV === 'production' && <Analytics />}</body></html>
 }

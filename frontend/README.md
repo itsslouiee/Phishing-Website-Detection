@@ -1,4 +1,4 @@
-# [PROJECT NAME]
+# Phishing Website Detection
 
 A polished Next.js frontend for a machine-learning-powered phishing website detection platform.
 
@@ -28,6 +28,8 @@ The API service layer currently maps these endpoints:
 - `GET /models` — available backend models
 - `GET /evaluation` — verified evaluation metrics
 
+Confirm the best model, selectable models and verified evaluation metrics in `lib/config.ts` (currently empty on purpose: no values are invented).
+
 Update `lib/api.ts` as the final FastAPI response schemas are agreed.
 
 ## Production build
@@ -37,3 +39,4 @@ pnpm build
 pnpm start
 ```
 
+No authentication, database, Docker, or secrets are required by this frontend.
