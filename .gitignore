@@ -22,12 +22,10 @@ env/
 *.log
 
 # Model / dataset artifacts
-models/
 *.joblib
-*.pkl
 /archive/dataset/
 /archive/model_artifacts/
 
 # Dataset / large generated content
 All_Features_threshold90.xlsx
-affected_features.csv
+validation/affected_features.csv
