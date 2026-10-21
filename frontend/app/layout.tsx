@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: 'Phishing Website Detection',
   description: 'Check before you click: analyze suspicious URLs with machine learning to help identify potential phishing websites.',
   generator: 'v0.app',
+  icons: {
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
+  },
 }
 
 export const viewport: Viewport = { colorScheme: 'dark', themeColor: '#0B1020' }
