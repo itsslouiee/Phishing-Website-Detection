@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { z } from 'zod'
 import { ArrowRight, CircleAlert, LockKeyhole } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ModelSelector } from '@/components/model-selector'
 import { ResultCard } from '@/components/result-card'
-import { analyzeUrl, getAvailableModels, type AnalysisMode, type AnalysisResult, type ModelOption } from '@/lib/api'
-import { DEFAULT_ANALYSIS_MODE } from '@/lib/config'
+import { useModelSelection } from '@/components/model-selection-provider'
+import { analyzeUrl, type AnalysisResult } from '@/lib/api'
 
 const urlSchema = z.string().trim().url('Enter a valid URL').refine((value) => {
   try {
@@ -20,57 +20,10 @@ const urlSchema = z.string().trim().url('Enter a valid URL').refine((value) => {
 
 export function Analyzer() {
   const [url, setUrl] = useState('')
-  const [mode, setMode] = useState<AnalysisMode>(DEFAULT_ANALYSIS_MODE)
-  const [model, setModel] = useState('')
-  const [availableModels, setAvailableModels] = useState<ModelOption[]>([])
-  const [defaultModelId, setDefaultModelId] = useState<string | null>(null)
-  const [modelLoading, setModelLoading] = useState(true)
-  const [modelError, setModelError] = useState('')
+  const { mode, model, setMode, setModel, availableModels, defaultModelId, loading: modelLoading, error: modelError } = useModelSelection()
   const [error, setError] = useState('')
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    let active = true
-
-    async function loadModels() {
-      try {
-        const models = await getAvailableModels()
-        if (!active) return
-
-        setAvailableModels(models)
-        setDefaultModelId(models.find((option) => option.id === 'xgboost')?.id ?? null)
-
-        const response = await fetch(`${(process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '')}/api/models`, { cache: 'no-store' })
-        if (!response.ok) throw new Error('Unable to load backend model metadata')
-        const payload = await response.json()
-
-        if (payload?.default_model) {
-          setDefaultModelId(payload.default_model)
-        }
-      } catch {
-        if (active) {
-          setModelError('Unable to load backend model metadata.')
-        }
-      } finally {
-        if (active) {
-          setModelLoading(false)
-        }
-      }
-    }
-
-    loadModels()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const activeModelId = mode === 'best' ? defaultModelId ?? '' : model
-    window.dispatchEvent(new CustomEvent('phishing-model-selection', { detail: { modelId: activeModelId } }))
-  }, [mode, model, defaultModelId])
 
   async function handleAnalyze(event: React.FormEvent) {
     event.preventDefault()
@@ -79,6 +32,10 @@ export function Analyzer() {
     const parsed = urlSchema.safeParse(url)
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Enter a valid URL')
+      return
+    }
+    if (mode === 'specific' && !model) {
+      setError('Choose a model first')
       return
     }
     setLoading(true)

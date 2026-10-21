@@ -128,10 +128,26 @@ export async function getAvailableModels(): Promise<ModelOption[]> {
   return json.models.map((model) => ({ id: model.id, label: model.name }))
 }
 
+export type ModelCatalog = { models: ModelOption[]; defaultModelId: string | null }
+
+// Same GET /api/models endpoint as getAvailableModels, but keeps the backend's default_model (the best model).
+export async function getModelCatalog(): Promise<ModelCatalog> {
+  if (DEMO_MODE || !API_BASE_URL) return { models: [], defaultModelId: null }
+
+  const response = await fetch(`${API_BASE_URL}/api/models`, { cache: 'no-store' })
+  if (!response.ok) throw new Error('Unable to load models')
+
+  const json: BackendModelsResponse = await response.json()
+  return {
+    models: json.models.map((model) => ({ id: model.id, label: model.name })),
+    defaultModelId: json.default_model ?? null,
+  }
+}
+
 export async function getEvaluationMetrics(): Promise<BackendEvaluationResponse | null> {
   if (DEMO_MODE || !API_BASE_URL) return null
 
-  const response = await fetch(`${API_BASE_URL}/api/evaluation`)
+  const response = await fetch(`${API_BASE_URL}/api/evaluation`, { cache: 'no-store' })
   if (!response.ok) throw new Error('Unable to load evaluation metrics')
 
   return response.json() as Promise<BackendEvaluationResponse>

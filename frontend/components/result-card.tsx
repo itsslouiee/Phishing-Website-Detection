@@ -20,12 +20,15 @@ export function ResultCard({ result }: { result: AnalysisResult }) {
       </div>
       <div className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-3">
         {result.confidence != null && (
-          <div><p className="text-[11px] uppercase tracking-[0.13em] text-[#64748b]">Confidence</p><p className="mt-1 font-mono text-sm text-[#e8edfa]">{Math.round(result.confidence * 100)}%</p></div>
+          <div><p className="text-[11px] uppercase tracking-[0.13em] text-[#64748b]">Prediction confidence</p><p className="mt-1 font-mono text-sm text-[#e8edfa]">{Math.round(result.confidence * 100)}%</p></div>
         )}
         <div><p className="text-[11px] uppercase tracking-[0.13em] text-[#64748b]">Model</p><p className="mt-1 text-sm text-[#c5cee0]">{result.modelName ?? 'Backend model pending'}</p></div>
         <div><p className="text-[11px] uppercase tracking-[0.13em] text-[#64748b]">Status</p><p className="mt-1 text-sm text-[#c5cee0]">{result.status}</p></div>
       </div>
-      {result.explanation && <p className="mt-4 rounded-xl border border-white/[0.06] bg-black/10 p-3 text-xs leading-5 text-[#94a3b8]">{result.explanation}</p>}
+      {result.confidence != null && (
+        <p className="mt-4 text-[11px] leading-4 text-[#64748b]">Confidence is this model’s score for this one URL. It is not the model’s overall accuracy, which is shown under Model evaluation.</p>
+      )}
+      {result.explanation && <p className="mt-3 rounded-xl border border-white/[0.06] bg-black/10 p-3 text-xs leading-5 text-[#94a3b8]">{result.explanation}</p>}
     </section>
   )
 }

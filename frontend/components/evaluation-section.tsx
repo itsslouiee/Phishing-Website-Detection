@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
-import { getAvailableModels, getEvaluationMetrics, type BackendEvaluationEntry, type BackendEvaluationResponse, type ModelOption } from '@/lib/api'
+import { useModelSelection } from '@/components/model-selection-provider'
+import { getEvaluationMetrics, type BackendEvaluationEntry, type BackendEvaluationResponse } from '@/lib/api'
 import type { EvaluationMetrics } from '@/lib/config'
 
 const METRICS: { key: keyof EvaluationMetrics; label: string; hint: string }[] = [
@@ -25,16 +26,19 @@ function MetricCard({ label, hint, value }: { label: string; hint: string; value
           <div className="h-full rounded-full bg-violet-400" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
         </div>
       )}
-      <p className="mt-3 text-[11px] leading-4 text-[#64748b]">{has ? hint : 'Awaiting data'}</p>
+      <p className="mt-3 text-[11px] leading-4 text-[#64748b]">{hint}</p>
     </div>
   )
 }
 
+const BestBadge = () => (
+  <span className="rounded-full border border-violet-400/25 bg-violet-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-200">Best model</span>
+)
+
 export function EvaluationSection() {
+  // Same state the analyzer uses, so the evaluation can never drift from the model that live prediction uses.
+  const { mode, activeModelId, availableModels, loading: selectionLoading } = useModelSelection()
   const [evaluation, setEvaluation] = useState<BackendEvaluationResponse | null>(null)
-  const [models, setModels] = useState<ModelOption[]>([])
-  const [defaultModelId, setDefaultModelId] = useState<string | null>(null)
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [view, setView] = useState<'selected' | 'compare'>('selected')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -44,66 +48,107 @@ export function EvaluationSection() {
 
     async function load() {
       try {
-        const [availableModels, evaluationData] = await Promise.all([getAvailableModels(), getEvaluationMetrics()])
-        if (!active) return
-
-        setModels(availableModels)
-        const backendDefault = await fetch(`${(process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '')}/api/models`, { cache: 'no-store' })
-        if (backendDefault.ok) {
-          const payload = await backendDefault.json()
-          if (payload?.default_model) {
-            setDefaultModelId(payload.default_model)
-            setSelectedModelId((current) => current ?? payload.default_model)
-          }
-        }
-        setEvaluation(evaluationData)
-        const defaultEntry = evaluationData?.models.find((entry) => entry.is_default)
-        if (defaultEntry?.model.id) {
-          setSelectedModelId((current) => current ?? defaultEntry.model.id)
-        } else if (availableModels[0]?.id) {
-          setSelectedModelId((current) => current ?? availableModels[0].id)
-        }
+        const data = await getEvaluationMetrics()
+        if (active) setEvaluation(data)
       } catch {
-        if (active) {
-          setError('Unable to load evaluation metrics from the backend.')
-        }
+        if (active) setError('Unable to load evaluation metrics from the backend.')
       } finally {
-        if (active) {
-          setLoading(false)
-        }
+        if (active) setLoading(false)
       }
     }
 
     load()
-
-    const handleSelection = (event: Event) => {
-      const detail = (event as CustomEvent<{ modelId?: string }>).detail
-      if (detail?.modelId) {
-        setSelectedModelId(detail.modelId)
-      }
-    }
-
-    window.addEventListener('phishing-model-selection', handleSelection)
-
     return () => {
       active = false
-      window.removeEventListener('phishing-model-selection', handleSelection)
     }
   }, [])
 
-  useEffect(() => {
-    if (!selectedModelId && defaultModelId) {
-      setSelectedModelId(defaultModelId)
+  const entries = useMemo<BackendEvaluationEntry[]>(() => evaluation?.models ?? [], [evaluation])
+
+  // Exact id match only. No fallback to entries[0]: showing another model's numbers would be wrong.
+  const selectedEntry = useMemo(() => entries.find((entry) => entry.model.id === activeModelId) ?? null, [entries, activeModelId])
+  const activeLabel = availableModels.find((option) => option.id === activeModelId)?.label ?? activeModelId
+
+  const topValues = useMemo(() => {
+    const top: Partial<Record<keyof EvaluationMetrics, number>> = {}
+    for (const metric of METRICS) top[metric.key] = Math.max(...entries.map((entry) => entry[metric.key]))
+    return top
+  }, [entries])
+
+  const missing = availableModels.filter((option) => !entries.some((entry) => entry.model.id === option.id))
+
+  const description = entries.length
+    ? `${evaluation?.method ?? 'Evaluation'}. ${evaluation?.note ?? ''} These are not live prediction confidence scores.`
+    : loading
+      ? 'Loading evaluation metrics from the backend…'
+      : error
+        ? error
+        : 'Verified evaluation metrics will appear here once available. No placeholder numbers, no inflated claims.'
+
+  function renderSelected() {
+    if (selectionLoading) return <p className="text-sm text-[#64748b]">Loading selected model…</p>
+    if (!activeModelId) {
+      return <p className="text-sm text-[#64748b]">The backend has not identified a best model, so there is nothing to show yet. Choose a model to see its evaluation.</p>
     }
-  }, [selectedModelId, defaultModelId])
+    if (!selectedEntry) {
+      return <p className="text-sm text-[#64748b]">The backend returned no evaluation metrics for {activeLabel}.</p>
+    }
+    return (
+      <div>
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3 className="text-sm font-medium text-[#e8edfa]">{selectedEntry.model.name}</h3>
+          {mode === 'best' && <span className="text-xs text-[#64748b]">Selected as Best Model</span>}
+          {selectedEntry.is_default && <BestBadge />}
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {METRICS.map((metric) => (
+            <MetricCard key={metric.key} label={metric.label} hint={metric.hint} value={selectedEntry[metric.key]} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
-  const entries = useMemo(() => evaluation?.models ?? [], [evaluation])
-  const selectedEntry = useMemo(
-    () => entries.find((entry) => entry.model.id === selectedModelId) ?? entries[0] ?? null,
-    [entries, selectedModelId],
-  )
-
-  const visibleEntries = view === 'selected' ? (selectedEntry ? [selectedEntry] : []) : entries
+  function renderCompare() {
+    return (
+      <div>
+        <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0b1020]">
+          <table className="w-full min-w-[34rem] text-left text-sm">
+            <caption className="sr-only">Evaluation metrics for every model</caption>
+            <thead>
+              <tr className="border-b border-white/[0.06] text-xs text-[#94a3b8]">
+                <th scope="col" className="px-4 py-3 font-medium">Model</th>
+                {METRICS.map((metric) => (
+                  <th key={metric.key} scope="col" className="px-4 py-3 text-right font-medium">{metric.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.model.id} className="border-b border-white/[0.04] last:border-0">
+                  <th scope="row" className="px-4 py-3.5 font-medium text-[#e8edfa]">
+                    <span className="flex flex-wrap items-center gap-2">{entry.model.name}{entry.is_default && <BestBadge />}</span>
+                  </th>
+                  {METRICS.map((metric) => {
+                    const top = entries.length > 1 && entry[metric.key] === topValues[metric.key]
+                    return (
+                      <td key={metric.key} className={`px-4 py-3.5 text-right font-mono tabular-nums ${top ? 'font-semibold text-violet-200' : 'text-[#c5cee0]'}`}>
+                        {pct(entry[metric.key])}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-[11px] leading-4 text-[#64748b]">
+          Highest value in each column is highlighted.
+          {missing.length > 0 && ` No evaluation metrics were returned for ${missing.map((option) => option.label).join(', ')}.`}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <section id="evaluation" aria-labelledby="evaluation-title" className="relative mx-auto max-w-5xl scroll-mt-6 px-5 pb-16 lg:px-8">
@@ -112,15 +157,7 @@ export function EvaluationSection() {
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-300">Model evaluation</p>
             <h2 id="evaluation-title" className="mt-2 text-2xl font-semibold tracking-[-0.03em]">How the models perform</h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#64748b]">
-              {entries.length
-                ? 'Metrics measured on held-out test data. They describe this evaluation only, not real-world effectiveness.'
-                : loading
-                  ? 'Loading evaluation metrics from the backend…'
-                  : error
-                    ? error
-                    : 'Verified evaluation metrics will appear here once available. No placeholder numbers, no inflated claims.'}
-            </p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[#64748b]">{description}</p>
           </div>
           <div className="hidden rounded-xl border border-violet-400/20 bg-violet-400/10 p-3 text-violet-200 sm:block"><BarChart3 className="size-5" aria-hidden /></div>
         </div>
@@ -131,8 +168,9 @@ export function EvaluationSection() {
               <button
                 key={option}
                 type="button"
+                aria-pressed={view === option}
                 onClick={() => setView(option)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${view === option ? 'bg-violet-400/15 font-medium text-violet-100 ring-1 ring-violet-400/30' : 'text-[#94a3b8] hover:bg-white/[0.04] hover:text-[#e8edfa]'}`}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-xs transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-violet-400 ${view === option ? 'bg-violet-400/15 font-medium text-violet-100 ring-1 ring-violet-400/30' : 'text-[#94a3b8] hover:bg-white/[0.04] hover:text-[#e8edfa]'}`}
               >
                 {option === 'selected' ? 'Selected Model' : 'Compare Models'}
               </button>
@@ -140,34 +178,22 @@ export function EvaluationSection() {
           </div>
         )}
 
-        <div className="mt-7 space-y-6">
-          {visibleEntries.length === 0 ? (
-            <div className="rounded-xl border border-white/[0.06] bg-[#0b1020] p-4 text-sm text-[#64748b]">
-              No evaluation metrics are currently available from the backend.
+        {entries.length > 0 && (
+          // min-h keeps the card from jumping when switching between the single-model and comparison layouts.
+          <div className="mt-7 min-h-[15rem]">
+            <div
+              key={view === 'selected' ? `selected-${activeModelId}` : 'compare'}
+              className="animate-in fade-in duration-300 motion-reduce:animate-none"
+            >
+              {view === 'selected' ? renderSelected() : renderCompare()}
             </div>
-          ) : (
-            visibleEntries.map((entry) => (
-              <div key={entry.model.id}>
-                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <h3 className="text-sm font-medium text-[#e8edfa]">{entry.model.name}</h3>
-                  {entry.is_default && (
-                    <span className="rounded-full border border-violet-400/25 bg-violet-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-200">Default · best model</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  {METRICS.map((metric) => (
-                    <MetricCard
-                      key={metric.key}
-                      label={metric.label}
-                      hint={metric.hint}
-                      value={entry[metric.key]}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+          </div>
+        )}
+        {entries.length === 0 && !loading && (
+          <div className="mt-7 rounded-xl border border-white/[0.06] bg-[#0b1020] p-4 text-sm text-[#64748b]">
+            No evaluation metrics are currently available from the backend.
+          </div>
+        )}
       </div>
     </section>
   )
