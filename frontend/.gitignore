@@ -1,16 +1,16 @@
-# v0 sandbox internal files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-.snowflake/
-.design-cache/
-.v0-trash/
-.vercel/
-
-# Environment variables
-.env*.local
-
-# Common ignores
+# dependencies
 node_modules
+.venv/
+venv/
+# next.js
 .next/
+out/
+next-env.d.ts
+
+# env files (keep .env.example)
+.env*.local
+.env
+
+# misc
 .DS_Store
+*.tsbuildinfo
