@@ -1,0 +1,24 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Local/dev-only files and large datasets that are not needed in the container.
+original_data.csv
+threshold_sweep.csv
+test_inference.py
+train_model.py
+threshold_sweep.py
+archive/
+validation/
+notebooks/
+
+# Keep the runtime artifacts the backend loads from the project root.
+!models/
+!feature_extraction/
+!inference_config.py
+!results_summary.csv
+!backend/requirements.txt
