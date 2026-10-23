@@ -70,6 +70,10 @@ def health():
     models = model_service.loaded()
     return Health(status="ok" if all(models.values()) else "degraded", models=models)
 
+@app.get("/")
+def read_root():
+    return {"message": "Phishing URL API is running. Docs at /docs"}
+
 
 @app.get("/api/v1/evaluation", response_model=EvaluationResponse)
 def evaluation():
