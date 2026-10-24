@@ -1,50 +1,52 @@
 # Phishing Website Detection
 
-A machine learning project for detecting phishing URLs using URL-based features, with a focus on reliable evaluation, consistent inference, and understanding the limitations of phishing classification.
+An end-to-end machine learning application that classifies URLs as **phishing** or **legitimate** in real time. Built with a Python ML pipeline, a FastAPI backend, a Next.js frontend, and containerized with Docker.
 
-This project explores how machine learning can distinguish legitimate URLs from phishing URLs, and why good evaluation matters just as much as good model performance.
+The current implementation uses **42 lexical features** extracted from the URL string without fetching the page or parsing the HTML. This pipeline estimates the probability that a URL is associated with phishing and applies a decision threshold to classify it.
 
-## Overview
+Three classifiers are trained and evaluated: **Logistic Regression, Random Forest, and XGBoost**. While XGBoost is the main model, the system includes a side-by-side `/api/v1/compare` endpoint to see how all three algorithms evaluate the same URL.
 
-The current implementation uses a **URL-only feature extraction pipeline** and an XGBoost classifier to estimate the probability that a URL is associated with phishing.
+## Approach & Dataset
 
-Rather than relying solely on accuracy scores, the project emphasizes:
+I initially started with a **content-based approach**, which extracted features from a webpage's HTML to train the ML model. You can find that original implementation here: [`archive/`](archive/).
 
-- Preventing data leakage during model evaluation.
-- Keeping training and inference features consistent.
-- Evaluating generalization across previously unseen domains.
-- Selecting a classification threshold based on precision and recall.
-- Investigating false positives, false negatives, and model limitations.
+However, I encountered a major setback with data collection: I was scraping live websites from PhishTank and Tranco datasets, but phishing URLs are frequently taken down. This made live data collection highly unreliable, as a URL labeled as phishing often had no webpage left to extract HTML from.
 
-## Current Approach
+To solve this, I pivoted to a **URL-only approach** and switched to the **CompPhish v4 dataset**, which provided pre-extracted URL and HTML features from legitimate and phishing websites. This allowed me to focus on building a robust ML pipeline and evaluating it.
 
-The current pipeline follows these steps:
+- **Source:** [CompPhish on Mendeley Data](https://data.mendeley.com/datasets/fmbs4kp9wz/4)
+- **Citation:** Goenka, Richa (2026), "CompPhish", Mendeley Data, V4, doi: [10.17632/fmbs4kp9wz.4](https://doi.org/10.17632/fmbs4kp9wz.4)
+- **Documentation:** [Read the dataset paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC13583946/)
 
-1. **URL feature extraction:** Extract numerical features directly from a URL.
-2. **Data preparation:** Remove identifiers and features that cannot be reliably reproduced during inference.
-3. **Domain-aware splitting:** Separate training and testing data by registrable domain to reduce domain overlap.
-4. **Model training and evaluation:** Train and compare models using appropriate evaluation metrics and grouped cross-validation.
-5. **Threshold analysis:** Examine how different classification thresholds affect precision, recall, and missed phishing URLs.
-6. **Inference:** Apply the same feature schema used during training to new URLs and classify them using the selected threshold.
+While this decision was mainly driven by the challenges I encountered, I later discovered other advantages of URL-only classification:
 
-The current model intentionally excludes HTML-derived features. These require page-content extraction and cannot be assumed to exist for every URL at inference time.
+- **Latency:** URL features can be extracted in milliseconds without waiting for a webpage to load.
+- **SSRF Risk:** It avoids the need for the backend server to fetch attacker-controlled URLs, reducing exposure to Server-Side Request Forgery (SSRF) risks.
 
-## Current Results
+## Limitations
 
-The following results are from the current evaluation. They are preliminary evidence of model performance, not a guarantee of real-world detection accuracy.
+Although URL-only classification is fast and avoids fetching webpage content, it has some limitations. The model relies on patterns in the URL, which means that small differences in a URL can affect its prediction, even when the URLs belong to the same legitimate website.
 
-| Metric | Result |
-|---|---:|
-| Input features | 42 URL-only features |
-| Evaluation split | Grouped by registrable domain |
-| Cross-validation | StratifiedGroupKFold |
-| XGBoost F1-score | 0.9234 |
-| XGBoost PR-AUC | 0.9776 |
-| XGBoost ROC-AUC | 0.9793 |
-| Selected threshold | 0.35 |
-| Telegram homepage phishing probability | 0.0128 |
+For example, during testing, the following Coursera URLs received different predictions:
 
-The classification threshold was selected to prioritize phishing recall while maintaining a useful level of precision.
+- `https://www.coursera.org/learn/machine-learning/home/module/1` was flagged as phishing.
+- `https://www.coursera.org/learn` was classified as legitimate.
+
+Similarly, some shortened URLs may be flagged as phishing because they provide limited information. For example, `https://bit.ly` was flagged as phishing during testing.
+
+These examples show that the model can incorrectly flag legitimate URLs as phishing, which is a **false positive**. The opposite can also happen when a phishing URL looks similar to a legitimate one and is classified as safe, resulting in a **false negative**.
+
+Since the model identifies patterns associated with phishing and does not verify whether a website is actually trustworthy, its predictions should therefore be treated as estimates rather than definitive judgments.
+
+## How It Works
+
+The following workflow outlines the main steps involved in processing a URL: 
+
+1. **URL input:** The user submits a URL through the web interface.
+2. **Feature extraction:** The backend extracts lexical features from the URL, such as its length, the number of special characters, and other URL patterns associated with phishing.
+3. **Consistent preprocessing:** The extracted features are prepared in the same format used during model training.
+4. **Prediction and classification:** The features are passed to the trained classifiers: **Logistic Regression, Random Forest, and XGBoost**, which estimate the probability that a URL is associated with phishing. 
+5. **Threshold:** The application applies a decision threshold (0.35) to the probability score to classify the URL as either phishing or legitimate, and returns the final result.
 
 ### Why the threshold matters
 
@@ -53,85 +55,85 @@ A model's default threshold of 0.5 is not necessarily the best operating point f
 - **Lower thresholds** can detect more phishing URLs but may produce more false positives.
 - **Higher thresholds** can reduce false positives but may allow more phishing URLs to go undetected.
 
-The current threshold of 0.35 was selected based on the project's threshold analysis, with a target recall of at least 0.95 and precision of at least 0.94.
+The current threshold of 0.35 was selected based on the project's threshold analysis, to prioritize phishing recall while maintaining a useful level of precision.
 
 See `threshold_sweep.csv` for the measured trade-offs.
 
-## Lessons from Evaluation
+## Model Evaluation & Results
 
-One of the most important findings was that strong evaluation metrics do not automatically mean a model generalizes well.
+The models were evaluated using **5-fold StratifiedGroupKFold cross-validation**, grouping URLs by registrable domain (e.g., URLs from `google.com` belong to the same group). This helps prevent domain-level data leakage by ensuring that URLs from the same domain do not appear in both the training and validation sets of a fold.
 
-The earlier pipeline achieved an XGBoost F1-score of 0.9711 but incorrectly assigned `telegram.org` a phishing probability of 0.92. Investigation revealed issues involving domain overlap between training and testing data, inconsistent feature availability, and features that indirectly encoded the labels.
+The metrics below are the mean scores across the five folds:
 
-After addressing these issues, the model achieved an F1-score of 0.9234 under the revised evaluation setup, while assigning `telegram.org` a phishing probability of 0.0128.
-
-The lower F1-score reflects a more rigorous evaluation rather than evidence that the previous model was better.
-
-This reinforced an important principle of machine learning: **a trustworthy evaluation is more valuable than an impressive but misleading score.**
-
-For the earlier experiments, datasets, and methodology, see [`archive/README.md`](archive/README.md).
+| **Model** | **Accuracy** | **Precision** | **Recall** | **F1-Score** | **PR-AUC** | **ROC-AUC** |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Logistic Regression | 0.9016 | 0.9161 | 0.8701 | 0.8924 | 0.9565 | 0.9558 |
+| Random Forest | 0.9310 | 0.9284 | 0.9240 | 0.9262 | 0.9718 | 0.9750 |
+| **XGBoost** | **0.9291** | **0.9333** | **0.9140** | **0.9234** | **0.9776** | **0.9793** |
 
 ## Project Structure
 
 ```text
-Phising-Website-Detection/
-├── archive/
-│   └── README.md
-├── feature_extraction/
-│   └── ...
-├── backend/
-│   └── ...
-├── frontend/
-│   └── ...
-├── models/
-│   └── ...
-├── train_model.py
-├── threshold_sweep.py
-├── test_inference.py
-├── inference_config.py
-├── results_summary.csv
-├── threshold_sweep.csv
-└── README.md
+Phishing-Website-Detection/
+├── archive/                # Previous implementation
+├── feature_extraction/     #  Original dataset feature extraction pipeline with some missing files added
+├── validation/              # Dataset validation using HTML content that came with it
+├── classifiers/              # Logistic Regression, Random Forest, XGBoost
+├── models/                   # Trained model (.pkl) files
+├── backend/                  # API and prediction logic
+├── frontend/                 # Web interface
+├── train_model.py            # Model training and evaluation
+├── threshold_sweep.py        # Decision threshold analysis and results are in threshold_sweep.csv
+├── inference_config.py       # Inference configuration
+├── original_data.csv   
+├── results_summary.csv       # Model evaluation results
+└── dockerfile                # Container configuration
+
 ```
 
-*Note: This is a representative structure. Adjust the paths to match the current repository layout.*
+## Quickstart
 
-### Key Files
+You can run the full stack locally using Docker or by running the frontend and backend separately.
 
-| File | Purpose |
-|---|---|
-| `train_model.py` | Model training, evaluation, and selection |
-| `threshold_sweep.py` | Analysis of classification thresholds |
-| `test_inference.py` | Inference smoke tests and feature-parity diagnostics |
-| `inference_config.py` | Central configuration for the phishing threshold |
-| `results_summary.csv` | Recorded model evaluation results |
-| `threshold_sweep.csv` | Precision and recall trade-offs across thresholds |
-| `models/` | Trained models and feature-column information |
-| `feature_extraction/` | URL feature extraction components |
-| `backend/` | Backend inference and application logic |
-| `frontend/` | User-facing interface |
+### Option A: Run via Docker (Recommended)
+Make sure you have Docker installed, then run:
 
-## Known Limitations
+```bash
+# Build the image
+docker build -t phishing-detector .
 
-The current implementation is a URL-only detector and has several limitations:
+# Run the container (maps port 8000)
+docker run -p 8000:8000 phishing-detector
+```
+### Option B: Manual Setup
 
-- **Shortener ambiguity:** `t.me`, Telegram's legitimate URL shortener, is incorrectly flagged as phishing. URL-only features may not reliably distinguish a benign shortener from a malicious one.
-- **No page-content analysis:** The model does not inspect HTML, JavaScript, forms, or rendered page behavior.
-- **No temporal evaluation:** Performance has not yet been established using a time-based train/test split.
-- **No adversarial robustness evaluation:** The model has not yet been systematically tested against deliberately manipulated URLs.
-- **Limited real-world validation:** Offline evaluation metrics do not establish how the detector will perform on live, evolving phishing campaigns.
+**1. Backend**
 
-Resolving redirects before classification is a potential future improvement, particularly for URL shorteners.
+```bash
+pip install -r requirements.txt
+cd backend
+uvicorn app.main:app --reload
+```
+**2. Frontend**
 
-## Future Work
+```bash
+cd frontend
+npm install
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+echo "NEXT_PUBLIC_GITHUB_URL=https://github.com/itsslouiee" >> .env.local
+npm run dev
+``` 
 
-Potential next steps include:
+## API Reference
 
-- Improve handling of legitimate URL shorteners and redirect chains.
-- Evaluate generalization using temporal splits.
-- Investigate adversarial manipulation of URL features.
-- Expand testing on diverse, previously unseen domains.
-- Explore additional signals when reliable and consistent inference-time extraction is possible.
+The backend exposes a REST API for URL classification, model comparison, and evaluation.
+
+| **Method** | **Endpoint** | **Description** |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Check API status and whether the models are loaded. |
+| `POST` | `/api/v1/predict` | Classify a URL using the main model (XGBoost). |
+| `POST` | `/api/v1/compare` | Compare predictions from all three models (Logistic Regression, Random Forest, and XGBoost). |
+| `GET` | `/api/v1/evaluation` | Retrieve evaluation metrics for the trained models. |
 
 ## A note on reliability
 
@@ -139,10 +141,5 @@ This is an educational project, and its predictions should not be treated as def
 
 ## Author
 
-**Louisa Hadji**
+[Louisa Hadji](https://github.com/itsslouiee)
 
-[GitHub](https://github.com/itsslouiee)
-
----
-
-*This README documents the current URL-only approach. Earlier experiments and their methodology are documented separately in [`archive/README.md`](archive/README.md).*
