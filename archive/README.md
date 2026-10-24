@@ -1,58 +1,56 @@
-# Phishing Website Detection
+# Previous Approach: Content-Based Phishing Detection
 
-A phishing website detection project that builds structured webpage features from URLs, trains a machine learning model, and predicts whether a site is phishing or legitimate.
+This is the original implementation of my phishing website detection project. It extracts **48 features (43 HTML/DOM elements and 5 URL lexical features)** from live webpages to train a machine learning classifier and predict whether a website is phishing or legitimate. 
 
-## Overview
+This approach was eventually archived in favor of the current URL-only pipeline. This document explains how the original system worked and why the approach was changed.
 
-This project uses a feature-based approach:
+## Why was this approach dropped?
 
-- collect URLs from phishing and legitimate sources
-- fetch the corresponding webpages
-- extract HTML and DOM-based features
-- save the structured output as CSV files
-- train a classifier on the structured data
+The content-based approach had a useful advantage: it could analyze a webpage's HTML structure, including elements such as login forms and password fields. However, it introduced a major challenge: **phishing websites often have very short lifespans.**
 
-The project currently focuses on DOM and HTML signals such as:
+The original plan relied on downloading live URLs from PhishTank. By the time the URLs were processed and the script attempted to fetch their webpages, many phishing sites were already offline.
 
-- presence of forms, inputs, buttons, images, and links
-- number of elements like tables, divs, spans, scripts, and links
-- title/text length and heading tags
-- login-related elements such as password or email fields
-- hidden inputs and iframe usage
+This led to:
+
+- Numerous failed requests, timeouts, and SSL errors.
+- A smaller dataset than expected, with potential sampling bias.
+- More time spent troubleshooting data collection than developing and evaluating the models.
+
+Rather than continue building around unreliable data, the project shifted to a pre-extracted dataset, CompPhish, and a URL-only feature extraction pipeline. This made it possible to focus on model training and evaluation without depending on the availability of live webpages.
+
+## How the original pipeline worked
+
+The original workflow followed five steps:
+
+1. **Collect URLs:** Gather phishing URLs from PhishTank and legitimate URLs from Tranco.
+2. **Fetch webpages:**  Use requests to retrieve live webpages and BeautifulSoup to parse their HTML.
+3. **Extract features:** Parse the HTML and DOM to identify potentially suspicious structures, focusing on signals such as:
+   - **Element presence:** Forms, inputs, buttons, images, and links.
+   - **Element counts:** Numbers of tables, divs, spans, scripts, and links.
+   - **Page content:** Title and text length, and the presence of heading tags.
+   - **Login-related elements:** Password fields, email fields, and other form elements associated with login pages.
+   - **Potentially suspicious structures:** Hidden inputs and iframe usage.
+   - **URL lexical features:** URL length, number of dots and hyphens, IP address usage, and HTTPS presence. 
+4. **Save data:** Store the extracted feature vectors in CSV files.
+5. **Train and evaluate:** Train and compare seven machine learning classifiers: Naive Bayes, SVM, Decision Tree, Random Forest, AdaBoost, Logistic Regression, and XGBoost.
 
 ## Project structure
 
 - `data_collector.py` — loads URL lists from CSV, fetches pages, extracts feature vectors, and writes structured dataset files
-- `features.py` — core feature detection functions for HTML elements and counts
-- `feature_extraction.py` — helper functions for parsing and organizing HTML features
-- `machine_learning.py` — combines the dataset, splits train/test sets, trains a classifier, and prints metrics
+- `features.py` — core feature detection functions
+- `machine_learning.py` — combines the dataset, splits train/test sets, trains and evaluates classifiers
 - `dataset/` — raw and structured datasets used for training and testing
-- `requirements.txt` — required Python packages
+- `app.py` — Streamlit web interface
 
 ## Dataset
 
-The project uses CSV files in the `dataset/` folder, including:
+The project uses the following CSV files:
 
 - `PhishTank_2026.csv` — phishing URLs
 - `structured_phishing_data.csv` — feature vectors labeled as phishing
 - `structured_legitimate_data.csv` — feature vectors labeled as legitimate
 - `tranco_K9LNW.csv` — source for legitimate URLs
-
-## Environment setup
-
-Create and activate a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-pip install numpy scikit-learn
-```
+- The dataset files are not included in this repository. You must download the required datasets from their original sources and place them in the `dataset/` directory.
 
 ## Run the workflow
 
@@ -70,20 +68,10 @@ This script reads a CSV of URLs, scrapes the page contents, extracts features, a
 python machine_learning.py
 ```
 
-This script:
-
-- reads the structured CSV datasets
-- combines the data
-- removes the URL column and duplicates
-- splits into train/test data
-- trains a `LinearSVC` classifier
-- prints accuracy, precision, and recall
-
 ## Notes
 
 - The script currently selects a range of rows from the source CSV using indexes in `data_collector.py`.
 - Some URLs may fail to load due to network restrictions, invalid domains, or SSL/timeouts, so the collector prints those failures instead of crashing.
-- The feature design is based on HTML structure and page elements, not on external URL reputation or browser behavior.
 
 ## Example output
 
@@ -98,15 +86,6 @@ Accuracy: ...
 Precision: ...
 Recall: ...
 ```
-
-## Future improvements
-
-- clean and validate the generated CSV data more strictly
-- add more URL-based lexical or network features
-- compare multiple classifiers such as RandomForest, AdaBoost, and GaussianNB
-- add a CLI for selecting phishing vs legitimate dataset generation
-- save model artifacts for reuse in prediction scripts
-
 ## License
 
-This project is for educational and research purposes.
+This project is for educational purposes.
