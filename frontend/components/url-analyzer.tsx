@@ -21,7 +21,7 @@ function BackendStatus({ state }: { state: AsyncState<Health> }) {
     text = `Backend online · ${ready} of ${MODEL_IDS.length} models ready`
   } else if (state.status === 'error') {
     dot = 'bg-danger'
-    text = state.kind === 'config' ? 'API address not configured' : 'Backend unreachable'
+    text = state.kind === 'config' ? 'API address not configured' : 'Starting detection engine...'
   }
 
   return (
