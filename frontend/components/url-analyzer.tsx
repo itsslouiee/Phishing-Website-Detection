@@ -20,8 +20,8 @@ function BackendStatus({ state }: { state: AsyncState<Health> }) {
     dot = allReady ? 'bg-safe' : 'bg-pink'
     text = `Backend online · ${ready} of ${MODEL_IDS.length} models ready`
   } else if (state.status === 'error') {
-    dot = 'bg-danger'
-    text = state.kind === 'config' ? 'API address not configured' : 'Starting detection engine...'
+    dot = state.kind === 'config' ? 'bg-danger' : 'bg-pink'
+    text = state.kind === 'config' ? 'API address not configured' : 'Detection engine is starting up · please wait ~1 min and refresh'
   }
 
   return (
